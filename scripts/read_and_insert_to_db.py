@@ -30,4 +30,4 @@ def read_data():
     with open('data.txt', 'r') as f:
         data_list = json.loads(f.read())
         for data in data_list:
-            db.travel_advisories.insert_one(data)
+            db.countries.insert_one(data)

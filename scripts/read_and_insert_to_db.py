@@ -26,7 +26,6 @@ db = client[mongo_db]
 
 
 def read_data():
-    get_dynamic_data()
     file = open('../static/data.txt', 'r')
     data_list = json.loads(file.read())
     db.travel_advisories.insert_many(data_list)

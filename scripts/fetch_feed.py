@@ -76,7 +76,7 @@ def get_dynamic_data():
     #     print(result)
     #     print('----------------------------------')
 
-    with open('data.txt', 'w') as json_file:
+    with open('/script/data.txt', 'w') as json_file:
         json.dump(final_result, json_file, indent=4)
     print('DEBUG: tmm')
 

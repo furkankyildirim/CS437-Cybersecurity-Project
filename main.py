@@ -124,6 +124,10 @@ def comment():
         user_id = get_jwt_identity()
         user = db.users.find_one({'_id': user_id})
 
+        if not user:
+            # Return an error message
+            return {'message': 'You must be logged in to comment.'}, 403
+
         # Insert the comment into MongoDB
         db.comments.insert_one({'user_id': user_id, 'username': user['username'],
                                 'content_id': content_id, 'comment': data})

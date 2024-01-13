@@ -22,6 +22,9 @@ client = MongoClient(mongo_uri)
 # Access the database
 db = client[mongo_db]
 
+# Delete all contents in the database
+db.contents.delete_many({})
+
 file = open('../static/data.txt', 'r')
 data_list = json.loads(file.read())
 db.contents.insert_many(data_list)

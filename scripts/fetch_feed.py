@@ -30,6 +30,7 @@ def get_dynamic_data():
     rows = table_body.find_all('tr')
 
     data = []
+    id = 0
     for row in rows:
         country_name = row.find('a').text.strip()
         # country_name = country_name.replace('', '\'')
@@ -54,12 +55,14 @@ def get_dynamic_data():
             break
 
         data.append({
+            '_id': id,
             'risk_image': svg_img,
             'country': display,
             'link': link,
             'risk_content': risk_content,
             'last_updated': last_updated
         })
+        id += 1
 
     final_result = []
 

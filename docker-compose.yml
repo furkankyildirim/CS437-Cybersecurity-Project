@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flask-app
+    container_name: flask-app
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - flask-mongo
+
+  flask-mongo:
+    image: mongo:latest
+    container_name: flask-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $MONGODB_USER
+      MONGO_INITDB_ROOT_PASSWORD: $MONGODB_PASSWORD

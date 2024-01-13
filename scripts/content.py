@@ -3,9 +3,7 @@
 import os
 import json
 from pymongo import MongoClient
-from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
-from fetch_feed import get_dynamic_data
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,10 +22,8 @@ client = MongoClient(mongo_uri)
 # Access the database
 db = client[mongo_db]
 
-
-def read_data():
-    file = open('../static/data.txt', 'r')
-    data_list = json.loads(file.read())
-    db.travel_advisories.insert_many(data_list)
-    print('Sample data added successfully!')
-    file.close()
+file = open('../static/data.txt', 'r')
+data_list = json.loads(file.read())
+db.contents.insert_many(data_list)
+print('Sample data added successfully!')
+file.close()

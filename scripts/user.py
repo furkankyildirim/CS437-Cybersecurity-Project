@@ -24,7 +24,6 @@ db = client[mongo_db]
 
 # Create two sample users
 user1 = {
-    'id': 0,
     'username': 'user1',
     'email': 'user1@example.com',
     'password': generate_password_hash('password1'),
@@ -32,7 +31,6 @@ user1 = {
 }
 
 user2 = {
-    'id': 1,
     'username': 'user2',
     'email': 'user2@example.com',
     'password': generate_password_hash('password2'),
@@ -40,7 +38,6 @@ user2 = {
 }
 
 admin = {
-    'id': 2,
     'username': 'admin',
     'email': 'admin@example.com',
     'password': generate_password_hash('admin'),

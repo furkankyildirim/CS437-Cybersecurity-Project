@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import concurrent.futures
 import json
 
+
 # URL = 'https://smartraveller.gov.au/destinations'
 
 def process_row(row):
@@ -29,16 +30,15 @@ def get_dynamic_data():
     rows = table_body.find_all('tr')
 
     data = []
-    id = 0
     for row in rows:
         country_name = row.find('a').text.strip()
         # country_name = country_name.replace('', '\'')
         display, link = display_and_link_name(country_name)
         try:
-            risk_content_div = row.find('div', class_=lambda value: value and ('do-not-travel' in value.lower() or 
-                                                                            'normal-precautions' in value.lower() or 
-                                                                            'increased-caution' in value.lower() or 
-                                                                            'reconsider-travel' in value.lower()))
+            risk_content_div = row.find('div', class_=lambda value: value and ('do-not-travel' in value.lower() or
+                                                                               'normal-precautions' in value.lower() or
+                                                                               'increased-caution' in value.lower() or
+                                                                               'reconsider-travel' in value.lower()))
             risk_content = risk_content_div.text.strip() if risk_content_div else None
         except AttributeError:
             risk_content = None
@@ -54,15 +54,12 @@ def get_dynamic_data():
             break
 
         data.append({
-            'id': id,
-            'risk_image': svg_img, 
+            'risk_image': svg_img,
             'country': display,
-            'link': link, 
-            'risk_content': risk_content, 
+            'link': link,
+            'risk_content': risk_content,
             'last_updated': last_updated
-            })
-
-        id += 1
+        })
 
     final_result = []
 
@@ -76,15 +73,20 @@ def get_dynamic_data():
     #     print(result)
     #     print('----------------------------------')
 
-    with open('/static/data.txt', 'w') as json_file:
-        json.dump(final_result, json_file, indent=4)
+    file = open('../static/data.txt', 'w')
+    file.write(json.dumps(final_result, indent=4))
     print('DEBUG: tmm')
+
 
 def display_and_link_name(country):
     display_name = country
 
-    link_name = country.lower().replace('\u00f4', 'o').replace('\u00e7', 'ç').replace('\u00e9', 'e').replace('\u00fc', 'u')
+    link_name = country.lower().replace('\u00f4', 'o').replace('\u00e7', 'ç').replace('\u00e9', 'e').replace('\u00fc',
+                                                                                                             'u')
     link_name = link_name.replace(' ', '-').replace('(', '').replace(')', '').replace(' &', '')
     link_name = link_name.replace('democratic republic of ', '').replace('republic of ', '')
 
     return display_name, link_name
+
+
+get_dynamic_data()

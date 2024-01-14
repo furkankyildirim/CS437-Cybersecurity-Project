@@ -2,7 +2,7 @@ import os
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
-
+from datetime import datetime
 # Load environment variables from .env file
 load_dotenv()
 
@@ -28,6 +28,7 @@ comment1 = {
     'user_id': user['_id'],
     'username': user['username'],
     'comment': 'This is a comment',
+    'date': datetime.now(),
     'content_id': content_id
 }
 
@@ -35,6 +36,7 @@ comment2 = {
     'user_id': user['_id'],
     'username': user['username'],
     'comment': 'This is another comment',
+    'date': datetime.now(),
     'content_id': content_id
 }
 

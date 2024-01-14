@@ -246,7 +246,9 @@ def comment():
 @app.route('/content/<int:id>')
 def content(id):
     # Your content handling logic here
-    pass
+    data = db.contents.find_one({'_id': id})
+    comments = list(db.comments.find({'content_id': id}))
+    return render_template('content.html', content=data, comments=comments)
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

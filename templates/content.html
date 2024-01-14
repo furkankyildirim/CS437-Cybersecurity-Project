@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    {{content['security_content'] | safe}}
+
+    <h2>Posted messages</h2>
+    {% if comments|length == 0 %}
+        <p>There are no messages yet.</p>
+    {% else %}
+        {% for comment in comments%}
+            <div class="comment">
+                <h3>{{comment['username']}}</h3>
+                <p>{{comment['comment']}}</p>
+                <p>{{comment['date']}}</p>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    
+</body>
+</html>

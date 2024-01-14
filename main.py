@@ -8,13 +8,14 @@ from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash
 
-import os
+import os, requests
 
 app = Flask(__name__)
 load_dotenv()
 
 # Set the secret key for session management
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'a_default_secret_key')
+app.config['RECAPTCHA_SECRET_KEY'] = 'your_secret_key_here'
 
 # MongoDB connection details
 mongo_user = os.getenv('MONGODB_USER')
@@ -63,6 +64,18 @@ def index():
     print(f"Current User Name: {current_user}")
     return render_template('index.html', user=current_user)  # Pass only the username
 
+@app.route('/verify_recaptcha', methods=['POST'])
+def verify_recaptcha():
+    recaptcha_response = request.form.get('g-recaptcha-response')
+    secret = app.config['RECAPTCHA_SECRET_KEY']
+    payload = {'secret': secret, 'response': recaptcha_response}
+    response = requests.post('https://www.google.com/recaptcha/api/siteverify', data=payload)
+    result = response.json()
+
+    if result['success']:
+        return "Captcha Verified Successfully"
+    else:
+        return "Captcha Verification Failed", 400
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -105,9 +118,25 @@ def login():
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        # ... [your CAPTCHA validation logic here] ...
         username = request.form.get('username')
         password = request.form.get('password')
+
+        # Get the reCAPTCHA response from the form
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        if not recaptcha_response:
+            flash('Please complete the reCAPTCHA.', 'error')
+            return render_template('admin_login.html')
+
+        # Verify the reCAPTCHA response with Google
+        data = {
+            'secret': '6Ld8r1ApAAAAAGbqlk-ng5kzyCMRk5nKEUGz0oxS',
+            'response': recaptcha_response
+        }
+        r = requests.post('https://www.google.com/recaptcha/api/siteverify', data=data)
+        result = r.json()
+        if not result.get('success'):
+            flash('Invalid reCAPTCHA. Please try again.', 'error')
+            return render_template('admin_login.html')
 
         # Retrieve the admin user from MongoDB based on the username
         admin_user = db.users.find_one({'username': username, 'isAdmin': True})
@@ -118,7 +147,7 @@ def admin_login():
                 expires_delta=timedelta(days=1),
                 additional_claims={"is_admin": True}
             )
-
+            
             # Set JWT as a cookie
             response = redirect(url_for('admin_dashboard'))
             response.set_cookie('access_token_cookie', value=access_token, httponly=True, secure=False)

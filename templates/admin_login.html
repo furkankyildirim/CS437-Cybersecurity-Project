@@ -16,6 +16,7 @@
         .captcha { text-align: center; margin-top: 20px; }
         .flash-messages { padding: 10px; text-align: center; color: red; }
     </style>
+    <script src='https://www.google.com/recaptcha/api.js' async defer></script>
 </head>
 <body>
     <div class="container">
@@ -38,9 +39,8 @@
                 <label>
                     <input type="password" name="password" placeholder="Password" required>
                 </label>
-                <div class="captcha">
-                    <!-- Your existing CAPTCHA section -->
-                </div>
+                <!-- reCAPTCHA widget -->
+                <div class="g-recaptcha" data-sitekey="6Ld8r1ApAAAAAJKgE1arj61H5fuI7LpksvN8hNx2"></div>
                 <button type="submit">Login</button>
             </form>
             <button onclick="location.href='/'" class="back-button">Back to Home</button>

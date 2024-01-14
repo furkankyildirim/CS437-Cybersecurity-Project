@@ -25,7 +25,7 @@ db = client[mongo_db]
 # Delete all contents in the database
 db.contents.delete_many({})
 
-file = open('../static/data.txt', 'r')
+file = open('static/data.txt', 'r')
 data_list = json.loads(file.read())
 db.contents.insert_many(data_list)
 print('Sample data added successfully!')

@@ -67,7 +67,15 @@
             <!-- <img src="example-travel-image.jpg" alt="Travel Image"> -->
             <h2>Latest Travel News</h2>
             <p>Here you can find the latest travel news and advice for Turkey...</p>
-        </div>
+            <table>
+                {% for data in data_list%}
+                    <tr>
+                        <th><a href="{{ url_for('content', id=data['_id']) }}">{{ data['country'] }}</a></th>
+                        <th>{{data['risk_content']}}</th>
+                        <th>{{data['last_updated']}}</th>
+                    </tr>
+                {% endfor %}
+            </table>
         <!-- Additional articles or content can be added here -->
     </div>
 

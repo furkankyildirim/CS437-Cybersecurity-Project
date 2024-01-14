@@ -53,7 +53,8 @@ def index():
         flash(f'Logged in as {current_user}', 'info')  # For debugging, remove this later
     else:
         flash('Not logged in.', 'warning')  # For debugging, remove this later
-    return render_template('index.html', user=current_user)
+    
+    return render_template('index.html', user=current_user, data_list=db.contents.find({}))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -154,6 +155,10 @@ def comment():
             # Return a success message
         return {'message': 'Comment deleted successfully.'}
 
+@app.route('/content/<int:id>')
+def content(id):
+    # Your content handling logic here
+    pass
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

@@ -79,6 +79,7 @@ def get_dynamic_data():
     file = open('../static/data.txt', 'w')
     file.write(json.dumps(final_result, indent=4))
     print('DEBUG: tmm')
+    file.close()
 
 
 def display_and_link_name(country):

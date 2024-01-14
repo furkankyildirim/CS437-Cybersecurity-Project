@@ -3,8 +3,7 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, \
-    get_jwt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies,get_jwt
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash

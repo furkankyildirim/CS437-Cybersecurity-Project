@@ -7,6 +7,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash
+
 from flask_mail import Mail, Message
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -111,11 +112,7 @@ class ForgotPasswordForm(FlaskForm):
 @limiter.limit("5 per minute")  # Apply rate limit to this route
 def forgot_password():
     form = ForgotPasswordForm()
-    if form.validate_on_submit() and 'recovery_code' in session:
-        recovery_code = form.otp.data
-        new_password = form.new_password.data
 
-<<<<<<< Updated upstream
     if 'reset_stage' not in session:
         # Stage 1: User is requesting OTP
         session['reset_stage'] = 'request_otp'
@@ -164,64 +161,13 @@ def forgot_password():
                 session.pop('reset_email', None)
                 session.pop('reset_stage', None)
 
-=======
-        # Verify OTP
-        if (session.get('recovery_code') == recovery_code and
-            int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
-            # Reset password logic
-            # [Update user's password in the database]
-            # This is where you would update the user's password in the database.
-            # Ensure to hash the new password before storing it.
-            email = session.get('reset_email')
-            user = db.users.find_one({'email': email})
-            if user:
-                db.users.update_one(
-                    {'_id': user['_id']}, 
-                    {'$set': {'password': generate_password_hash(new_password)}}
-                )
->>>>>>> Stashed changes
                 flash('Your password has been reset successfully.', 'success')
+                return redirect(url_for('login'))
             else:
-                flash('User not found.', 'error')
-
-            # Clear session variables related to reset
-            session.pop('recovery_code', None)
-            session.pop('recovery_code_timestamp', None)
-            session.pop('reset_email', None)
-
-            return redirect(url_for('login'))
-        else:
-            flash('Invalid or expired recovery code.', 'error')
+                flash('Invalid or expired recovery code.', 'error')
 
     return render_template('forgot_password.html', form=form)
 
-<<<<<<< Updated upstream
-=======
-# New route for requesting OTP
-@app.route('/request_otp', methods=['POST'])
-@limiter.limit("5 per minute")
-def request_otp():
-    email = request.form.get('email')
-    if email:
-        recovery_code = pyotp.random_base32()
-        session['recovery_code'] = recovery_code
-        session['recovery_code_timestamp'] = int(time.time())
-        session['reset_email'] = email
-        subject = 'Password Reset Code'
-        body = f'Your password reset code is: {recovery_code}'
-        msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
-        msg.body = body
-
-        try:
-            mail.send(msg)
-            flash('An email with a recovery code has been sent to your email address.', 'info')
-        except Exception as e:
-            flash(f'Error sending the email: {str(e)}', 'error')
-    else:
-        flash('Please enter a valid email address.', 'error')
-
-    return redirect(url_for('forgot_password'))
->>>>>>> Stashed changes
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

@@ -2,20 +2,44 @@
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, session, render_template, request, redirect, url_for, flash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, get_jwt
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash
 from flask_mail import Mail, Message
-import os, requests
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import os, requests, pyotp, random, time
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Email, Length
 
 app = Flask(__name__)
 load_dotenv()
 
+# Initialize Flask-Limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,  # Rate limiting by IP address
+    storage_uri='memory://',  # In-memory storage (for testing, use a persistent storage in production)
+)
+
 # Set the secret key for session management
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'a_default_secret_key')
 app.config['RECAPTCHA_SECRET_KEY'] = 'your_secret_key_here'
+
+# Configure Flask-Mail for sending emails
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USERNAME'] = 'cs437mfa@gmail.com'  # Your Gmail email address
+app.config['MAIL_PASSWORD'] = 'vzzy pxea yqma mffx'  # Application password generated for Gmail
+#app.config['MAIL_DEBUG'] = True
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+
+# Initialize Flask-Mail
+mail = Mail(app)
 
 # MongoDB connection details
 mongo_user = os.getenv('MONGODB_USER')
@@ -45,12 +69,6 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_SECURE'] = False  # Should be true in production with HTTPS
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Enable CSRF protection in production
 
-#@app.route('/')
-#@jwt_required(optional=True)
-#def index():
-    #current_user = get_jwt_identity()
-    #return render_template('index.html', user=current_user)
-
 @app.route('/')
 @jwt_required(optional=True)
 def index():
@@ -78,45 +96,70 @@ def verify_recaptcha():
         return "Captcha Verification Failed", 400
         flash('Not logged in.', 'warning')  # For debugging, remove this later
 
-@app.route('/reset_password', methods=['GET', 'POST'])
-def reset_password():
-    if request.method == 'POST':
-        # Get the user's email, token, and new password from the form
-        email = request.form.get('email')
-        token = request.form.get('token')
-        new_password = request.form.get('new_password')
-        
-        # Verify the token and email in your database
-        # If valid, update the password for the user
-        # Redirect the user to the login page after successful password reset
-        flash('Your password has been reset successfully. You can now log in with your new password.', 'success')
-        return redirect(url_for('login'))
-    
-    # Get the token from the URL (e.g., /reset_password?token=your_generated_token)
-    token = request.args.get('token')
-    # Validate the token and email in your database
-    if token_is_valid(token):
-        return render_template('reset_password.html', token=token)
-    else:
-        flash('Invalid or expired reset token. Please request a new password reset.', 'error')
-        return redirect(url_for('forgot_password'))
+# Define the form for entering the email
+class ForgotPasswordForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    otp = StringField('OTP', validators=[Length(min=6, max=6)])
+    new_password = PasswordField('New Password', validators=[Length(min=8)])
+    submit = SubmitField('Submit')
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")  # Apply rate limit to this route
 def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        # Check if the email exists in your database
-        # Generate a unique token
-        # Save the token in your database with the email
-        # Send a reset link to the email
-        # Include the token in the reset link URL
-        # Example: /reset_password?token=your_generated_token
-        # Send the email with the reset link
-        # Flash a message to inform the user that an email has been sent
-        flash('An email with reset instructions has been sent to your email address.', 'info')
-        return redirect(url_for('login'))
-    return render_template('forgot_password.html')
+    form = ForgotPasswordForm()
 
+    if 'reset_stage' not in session:
+        # Stage 1: User is requesting OTP
+        session['reset_stage'] = 'request_otp'
+
+    if session['reset_stage'] == 'request_otp':
+        if form.validate_on_submit() and form.otp.data == "":
+            # User is requesting OTP
+            email = form.email.data
+
+            # Generate and send OTP, store in session
+            recovery_code = pyotp.random_base32()
+            session['recovery_code'] = recovery_code
+            session['recovery_code_timestamp'] = int(time.time())
+            session['reset_email'] = email  # Store the email in session
+
+            # Send the recovery code via email
+            subject = 'Password Reset Code'
+            body = f'Your password reset code is: {recovery_code}'
+            msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
+            msg.body = body
+
+            try:
+                mail.send(msg)
+                flash('An email with a recovery code has been sent to your email address. Enter the code and your new password below.', 'info')
+                session['reset_stage'] = 'verify_otp'  # Move to the next stage
+            except Exception as e:
+                flash(f'Error sending the email: {str(e)}', 'error')
+
+    elif session['reset_stage'] == 'verify_otp':
+        if form.validate_on_submit():
+            # User is submitting OTP and new password
+            recovery_code = form.otp.data
+            new_password = form.new_password.data
+
+            # Verify OTP
+            if (session.get('recovery_code') == recovery_code and
+                int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
+                # Reset password logic
+                # [Update user's password in the database]
+
+                # Clear session variables related to reset
+                session.pop('recovery_code', None)
+                session.pop('recovery_code_timestamp', None)
+                session.pop('reset_email', None)
+                session.pop('reset_stage', None)
+
+                flash('Your password has been reset successfully.', 'success')
+                return redirect(url_for('login'))
+            else:
+                flash('Invalid or expired recovery code.', 'error')
+
+    return render_template('forgot_password.html', form=form)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

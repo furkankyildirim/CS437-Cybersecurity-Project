@@ -2,11 +2,12 @@
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, get_jwt
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, \
+    get_jwt
 from bson.objectid import ObjectId
 from pymongo import MongoClient
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import os, requests
 
@@ -45,11 +46,12 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_SECURE'] = False  # Should be true in production with HTTPS
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Enable CSRF protection in production
 
-#@app.route('/')
-#@jwt_required(optional=True)
-#def index():
-    #current_user = get_jwt_identity()
-    #return render_template('index.html', user=current_user)
+
+# @app.route('/')
+# @jwt_required(optional=True)
+# def index():
+# current_user = get_jwt_identity()
+# return render_template('index.html', user=current_user)
 
 @app.route('/')
 @jwt_required(optional=True)
@@ -63,6 +65,7 @@ def index():
             current_user = user.get("username")
     print(f"Current User Name: {current_user}")
     return render_template('index.html', user=current_user, data_list=db.contents.find({}))  # Pass only the username
+
 
 @app.route('/verify_recaptcha', methods=['POST'])
 def verify_recaptcha():
@@ -116,6 +119,7 @@ def login():
     # If it's a GET request, render the login page
     return render_template('login.html')
 
+
 # Admin login route
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
@@ -149,7 +153,7 @@ def admin_login():
                 expires_delta=timedelta(days=1),
                 additional_claims={"is_admin": True}
             )
-            
+
             # Set JWT as a cookie
             response = redirect(url_for('admin_dashboard'))
             response.set_cookie('access_token_cookie', value=access_token, httponly=True, secure=False)
@@ -165,6 +169,69 @@ def admin_login():
     # If it's a GET request, render the admin login page
     return render_template('admin_login.html')
 
+
+def get_users():
+    # Retrieve all users from MongoDB
+    data = list(db.users.find({}))
+
+    # Remove the password field from each user
+    for user in data:
+        del user['password']
+
+    # Remove admin users from the list
+    data = [user for user in data if not user['isAdmin']]
+    # Return users in JSON format
+    return data
+
+
+@app.route('/users', methods=['GET', 'POST', 'DELETE'])
+@jwt_required()
+def users():
+    if request.method == 'GET':
+        user = db.users.find_one({'_id': ObjectId(get_jwt_identity())})
+        if not user or not user['isAdmin']:
+            # Return an error message
+            return {'message': 'You do not have permission to view users.'}, 403
+
+        return get_users()
+
+    if request.method == 'POST':
+        # Get the username, email, password, and isAdmin from the request body
+        current_user = get_jwt_identity()
+        user = db.users.find_one({'_id': ObjectId(current_user)})
+
+        if not user or not user['isAdmin']:
+            # Return an error message
+            return {'message': 'You do not have permission to add a user.'}, 403
+
+        username = request.json['username']
+        email = request.json['email']
+        password = request.json['password']
+
+        # Insert the user into MongoDB
+        db.users.insert_one({'username': username, 'email': email,
+                             'password': generate_password_hash(password), 'isAdmin': False})
+
+        # Return a success message
+        return jsonify({'message': 'User added successfully.'})
+
+    if request.method == 'DELETE':
+        # Get the user id from the request body
+        current_user = get_jwt_identity()
+        user = db.users.find_one({'_id': ObjectId(current_user)})
+
+        if not user or not user['isAdmin']:
+            # Return an error message
+            return {'message': 'You do not have permission to delete a user.'}, 403
+
+        username = request.args.get('username')
+
+        db.users.delete_one({'username': username})
+
+        # Return a success message
+        return jsonify({'message': 'User deleted successfully.'})
+
+
 @app.route('/admin_dashboard')
 @jwt_required()
 def admin_dashboard():
@@ -176,11 +243,14 @@ def admin_dashboard():
     admin_user = db.users.find_one({'_id': ObjectId(user_id)})
     username = admin_user.get('username', 'Unknown') if admin_user else 'Unknown'
 
-    if claims.get("is_admin"):
-        return render_template('admin_dashboard.html', user_id=user_id, username=username)
-    else:
+    if not claims.get("is_admin"):
         flash("You do not have permission to access the admin dashboard.", "error")
         return redirect(url_for('index'))
+
+    # Call the users API to get all users
+    user_data = get_users()
+    return render_template('admin_dashboard.html', user_id=user_id, username=username,
+                           users=user_data, user_count=len(user_data))
 
 
 @app.route('/logout', methods=['GET'])
@@ -243,10 +313,12 @@ def comment():
             # Return a success message
         return {'message': 'Comment deleted successfully.'}
 
+
 @app.route('/content/<int:id>')
 def content(id):
     # Your content handling logic here
     pass
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

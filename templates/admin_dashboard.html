@@ -1,0 +1,71 @@
+<!-- admin_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Turkish Travel Advice</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; margin: 0; background-color: #f4f4f4; }
+        .header { background-color: #005f6b; padding: 20px; text-align: center; color: white; }
+        .header h1 { margin: 0; }
+        .nav { overflow: hidden; background-color: #333; }
+        .nav a { float: left; display: block; color: white; text-align: center; padding: 14px 16px; text-decoration: none; }
+        .nav a:hover { background-color: #ddd; color: black; }
+        .content { padding: 20px; }
+        .article { background-color: white; margin-bottom: 20px; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .article img { max-width: 100%; height: auto; border-radius: 5px; }
+        .article h2 { color: #005f6b; }
+        .footer { background-color: #333; color: white; text-align: center; padding: 10px; }
+        .user-info { float: right; }
+        .nav a.login-link { float: right; }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .alert-success { color: #3c763d; background-color: #dff0d8; border-color: #d6e9c6; }
+        .alert-error { color: #a94442; background-color: #f2dede; border-color: #ebccd1; }
+        
+        /* Add additional CSS styles specific to the admin dashboard page */
+        .container { max-width: 800px; margin: auto; padding: 20px; }
+        button { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Turkish Travel Advice</h1>
+            <!-- Display logged-in admin's name -->
+            <div class="user-info">
+                {% if username %}
+                    Welcome, {{ username }} | <a href="/logout" style="color: white;">Logout</a>
+                {% else %}
+                    <a href="/login" class="login-link" style="color: white;">Login</a>
+                    <!-- Add an Admin Login link -->
+                    <a href="/admin_login" class="login-link" style="color: white; margin-left: 10px;">Admin Login</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <h1>Admin Dashboard</h1>
+
+            <!-- Display Admin User ID and Name -->
+            <p>Logged in as: <strong>{{ username }}</strong> (User ID: {{ user_id }})</p>
+            <!-- Home Button -->
+            <button onclick="location.href='/'">Home</button>
+
+            <h2>Manage Users</h2>
+            <!-- Users Management Section -->
+            <!-- Add form/interface for adding and removing users -->
+
+            <h2>Manage Comments</h2>
+            <!-- Comments Management Section -->
+            <!-- Add form/interface for managing comments on index page content -->
+        </div>
+    </div>
+</body>
+</html>

@@ -3,18 +3,19 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies
-
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, get_jwt
+from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash
 
-import os
+import os, requests
 
 app = Flask(__name__)
 load_dotenv()
 
 # Set the secret key for session management
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'a_default_secret_key')
+app.config['RECAPTCHA_SECRET_KEY'] = 'your_secret_key_here'
 
 # MongoDB connection details
 mongo_user = os.getenv('MONGODB_USER')
@@ -44,17 +45,38 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_SECURE'] = False  # Should be true in production with HTTPS
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Enable CSRF protection in production
 
+#@app.route('/')
+#@jwt_required(optional=True)
+#def index():
+    #current_user = get_jwt_identity()
+    #return render_template('index.html', user=current_user)
 
 @app.route('/')
 @jwt_required(optional=True)
 def index():
-    current_user = get_jwt_identity()
-    if current_user:
-        flash(f'Logged in as {current_user}', 'info')  # For debugging, remove this later
+    current_user_id = get_jwt_identity()
+    print(f"Current User ID: {current_user_id}")
+    current_user = None
+    if current_user_id:
+        user = db.users.find_one({"_id": ObjectId(current_user_id)})
+        if user:
+            current_user = user.get("username")
+    print(f"Current User Name: {current_user}")
+    return render_template('index.html', user=current_user, data_list=db.contents.find({}))  # Pass only the username
+
+@app.route('/verify_recaptcha', methods=['POST'])
+def verify_recaptcha():
+    recaptcha_response = request.form.get('g-recaptcha-response')
+    secret = app.config['RECAPTCHA_SECRET_KEY']
+    payload = {'secret': secret, 'response': recaptcha_response}
+    response = requests.post('https://www.google.com/recaptcha/api/siteverify', data=payload)
+    result = response.json()
+
+    if result['success']:
+        return "Captcha Verified Successfully"
     else:
+        return "Captcha Verification Failed", 400
         flash('Not logged in.', 'warning')  # For debugging, remove this later
-    
-    return render_template('index.html', user=current_user, data_list=db.contents.find({}))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -94,10 +116,76 @@ def login():
     # If it's a GET request, render the login page
     return render_template('login.html')
 
+# Admin login route
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # Get the reCAPTCHA response from the form
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        if not recaptcha_response:
+            flash('Please complete the reCAPTCHA.', 'error')
+            return render_template('admin_login.html')
+
+        # Verify the reCAPTCHA response with Google
+        data = {
+            'secret': '6Ld8r1ApAAAAAGbqlk-ng5kzyCMRk5nKEUGz0oxS',
+            'response': recaptcha_response
+        }
+        r = requests.post('https://www.google.com/recaptcha/api/siteverify', data=data)
+        result = r.json()
+        if not result.get('success'):
+            flash('Invalid reCAPTCHA. Please try again.', 'error')
+            return render_template('admin_login.html')
+
+        # Retrieve the admin user from MongoDB based on the username
+        admin_user = db.users.find_one({'username': username, 'isAdmin': True})
+        if admin_user and check_password_hash(admin_user['password'], password):
+            # Authentication successful, create JWT with admin claims
+            access_token = create_access_token(
+                identity=str(admin_user['_id']),
+                expires_delta=timedelta(days=1),
+                additional_claims={"is_admin": True}
+            )
+            
+            # Set JWT as a cookie
+            response = redirect(url_for('admin_dashboard'))
+            response.set_cookie('access_token_cookie', value=access_token, httponly=True, secure=False)
+
+            # Flash a success message
+            flash('Admin login successful!', 'success')
+            return response
+
+        # Authentication failed, show an error message
+        flash('Invalid admin credentials. Please try again.', 'error')
+        return render_template('admin_login.html')
+
+    # If it's a GET request, render the admin login page
+    return render_template('admin_login.html')
+
+@app.route('/admin_dashboard')
+@jwt_required()
+def admin_dashboard():
+    claims = get_jwt()
+    user_id = get_jwt_identity()  # Assuming this retrieves the user ID
+
+    # Retrieve admin's username from the database using user_id
+    # Replace 'username_field' with the actual field name for the username in your database
+    admin_user = db.users.find_one({'_id': ObjectId(user_id)})
+    username = admin_user.get('username', 'Unknown') if admin_user else 'Unknown'
+
+    if claims.get("is_admin"):
+        return render_template('admin_dashboard.html', user_id=user_id, username=username)
+    else:
+        flash("You do not have permission to access the admin dashboard.", "error")
+        return redirect(url_for('index'))
+
 
 @app.route('/logout', methods=['GET'])
 def logout():
-    response = redirect(url_for('login'))
+    response = redirect(url_for('index'))
     unset_jwt_cookies(response)  # This will remove the JWT cookies
     flash('You have been logged out.', 'info')
     return response

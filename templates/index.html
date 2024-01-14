@@ -40,9 +40,11 @@
                 Welcome, {{ user }} | <a href="/logout" style="color: white;">Logout</a>
             {% else %}
                 <a href="/login" class="login-link" style="color: white;">Login</a>
+                <!-- Admin Login link -->
+                <a href="/admin_login" class="login-link" style="color: white; margin-left: 10px;">Admin Login</a>
             {% endif %}
-        </div>
-    </div>
+        </div>        
+    </div>    
 
     <!-- Flash messages section -->
     <div class="flash-messages">

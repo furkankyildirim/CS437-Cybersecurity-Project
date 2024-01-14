@@ -7,7 +7,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash
-
+from flask_mail import Mail, Message
 import os, requests
 
 app = Flask(__name__)
@@ -77,6 +77,45 @@ def verify_recaptcha():
     else:
         return "Captcha Verification Failed", 400
         flash('Not logged in.', 'warning')  # For debugging, remove this later
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        # Get the user's email, token, and new password from the form
+        email = request.form.get('email')
+        token = request.form.get('token')
+        new_password = request.form.get('new_password')
+        
+        # Verify the token and email in your database
+        # If valid, update the password for the user
+        # Redirect the user to the login page after successful password reset
+        flash('Your password has been reset successfully. You can now log in with your new password.', 'success')
+        return redirect(url_for('login'))
+    
+    # Get the token from the URL (e.g., /reset_password?token=your_generated_token)
+    token = request.args.get('token')
+    # Validate the token and email in your database
+    if token_is_valid(token):
+        return render_template('reset_password.html', token=token)
+    else:
+        flash('Invalid or expired reset token. Please request a new password reset.', 'error')
+        return redirect(url_for('forgot_password'))
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        # Check if the email exists in your database
+        # Generate a unique token
+        # Save the token in your database with the email
+        # Send a reset link to the email
+        # Include the token in the reset link URL
+        # Example: /reset_password?token=your_generated_token
+        # Send the email with the reset link
+        # Flash a message to inform the user that an email has been sent
+        flash('An email with reset instructions has been sent to your email address.', 'info')
+        return redirect(url_for('login'))
+    return render_template('forgot_password.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])

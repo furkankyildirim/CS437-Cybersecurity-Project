@@ -16,6 +16,9 @@ import os, requests, pyotp, time
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, Length
+from flask_pymongo import PyMongo
+from email.message import EmailMessage
+import smtplib
 
 app = Flask(__name__)
 load_dotenv()
@@ -35,7 +38,7 @@ app.config['RECAPTCHA_SECRET_KEY'] = 'your_secret_key_here'
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USERNAME'] = 'cs437mfa@gmail.com'  # Your Gmail email address
-app.config['MAIL_PASSWORD'] = 'vzzy pxea yqma mffx'  # Application password generated for Gmail
+app.config['MAIL_PASSWORD'] = 'kvsg mabn dmnd xgcp'  # Application password generated for Gmail
 #app.config['MAIL_DEBUG'] = True
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False

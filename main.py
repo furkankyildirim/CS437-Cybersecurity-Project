@@ -107,66 +107,67 @@ class ForgotPasswordForm(FlaskForm):
     new_password = PasswordField('New Password', validators=[Length(min=8)])
     submit = SubmitField('Submit')
 
-
 @app.route('/forgot_password', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")  # Apply rate limit to this route
 def forgot_password():
     form = ForgotPasswordForm()
+    if form.validate_on_submit() and 'recovery_code' in session:
+        recovery_code = form.otp.data
+        new_password = form.new_password.data
 
-    if 'reset_stage' not in session:
-        # Stage 1: User is requesting OTP
-        session['reset_stage'] = 'request_otp'
-
-    if session['reset_stage'] == 'request_otp':
-        if form.validate_on_submit() and form.otp.data == "":
-            # User is requesting OTP
-            email = form.email.data
-
-            # Generate and send OTP, store in session
-            recovery_code = pyotp.random_base32()
-            session['recovery_code'] = recovery_code
-            session['recovery_code_timestamp'] = int(time.time())
-            session['reset_email'] = email  # Store the email in session
-
-            # Send the recovery code via email
-            subject = 'Password Reset Code'
-            body = f'Your password reset code is: {recovery_code}'
-            msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
-            msg.body = body
-
-            try:
-                mail.send(msg)
-                flash(
-                    'An email with a recovery code has been sent to your email address. Enter the code and your new password below.',
-                    'info')
-                session['reset_stage'] = 'verify_otp'  # Move to the next stage
-            except Exception as e:
-                flash(f'Error sending the email: {str(e)}', 'error')
-
-    elif session['reset_stage'] == 'verify_otp':
-        if form.validate_on_submit():
-            # User is submitting OTP and new password
-            recovery_code = form.otp.data
-            new_password = form.new_password.data
-
-            # Verify OTP
-            if (session.get('recovery_code') == recovery_code and
-                    int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
-                # Reset password logic
-                # [Update user's password in the database]
-
-                # Clear session variables related to reset
-                session.pop('recovery_code', None)
-                session.pop('recovery_code_timestamp', None)
-                session.pop('reset_email', None)
-                session.pop('reset_stage', None)
-
+        # Verify OTP
+        if (session.get('recovery_code') == recovery_code and
+            int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
+            # Reset password logic
+            # [Update user's password in the database]
+            # This is where you would update the user's password in the database.
+            # Ensure to hash the new password before storing it.
+            email = session.get('reset_email')
+            user = db.users.find_one({'email': email})
+            if user:
+                db.users.update_one(
+                    {'email': email}, 
+                    {'$set': {'password': generate_password_hash(new_password)}}
+                )
                 flash('Your password has been reset successfully.', 'success')
-                return redirect(url_for('login'))
             else:
-                flash('Invalid or expired recovery code.', 'error')
+                flash('User not found.', 'error')
+
+            # Clear session variables related to reset
+            session.pop('recovery_code', None)
+            session.pop('recovery_code_timestamp', None)
+            session.pop('reset_email', None)
+
+            return redirect(url_for('login'))
+        else:
+            flash('Invalid or expired recovery code.', 'error')
 
     return render_template('forgot_password.html', form=form)
+
+# New route for requesting OTP
+@app.route('/request_otp', methods=['POST'])
+@limiter.limit("5 per minute")
+def request_otp():
+    email = request.form.get('email')
+    if email:
+        recovery_code = pyotp.random_base32()
+        session['recovery_code'] = recovery_code
+        session['recovery_code_timestamp'] = int(time.time())
+        session['reset_email'] = email
+        subject = 'Password Reset Code'
+        body = f'Your password reset code is: {recovery_code}'
+        msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
+        msg.body = body
+
+        try:
+            mail.send(msg)
+            flash('An email with a recovery code has been sent to your email address.', 'info')
+        except Exception as e:
+            flash(f'Error sending the email: {str(e)}', 'error')
+    else:
+        flash('Please enter a valid email address.', 'error')
+
+    return redirect(url_for('forgot_password'))
 
 
 @app.route('/login', methods=['GET', 'POST'])

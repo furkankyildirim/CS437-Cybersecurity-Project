@@ -154,16 +154,28 @@
             {% for user in users %}
                 <!-- Add a Delete link for each user with DELETE method -->
                 <li>{{ user.username }} ({{ user.email }}) (User ID: {{ user._id }})
-                    <button onclick="deleteUser('{{ user.username }}')">Delete</button>
+                    <button onclick="deleteUser('{{ user._id }}')">Delete</button>
                 </li>
             {% endfor %}
         </ul>
 
+        <h2>Manage Comments</h2>
+        <!-- Comments Management Section -->
+        <!-- Display list of comments from /comments endpoint -->
+        <h3>Comments</h3>
+        <ul>
+            {% for comment in comments %}
+                <!-- Add a Delete link for each comment with DELETE method -->
+                <li>{{ comment.comment }} ({{ comment.username }}) (Comment ID: {{ comment._id }})
+                    <button onclick="deleteComment('{{ comment._id }}')">Delete</button>
+                </li>
+            {% endfor %}
+
         <script>
-        function deleteUser(username) {
+        function deleteUser(userId) {
             if (confirm('Are you sure you want to delete this user?')) {
 
-                fetch(`/users?username=${username}`, {
+                fetch(`/users?user_id=${userId}`, {
                     method: 'DELETE'
                 })
                 .then(response => {
@@ -203,11 +215,29 @@
                 alert('Error adding user.');
             });
         }
+
+        function deleteComment(comment_id) {
+            if (confirm('Are you sure you want to delete this comment?')) {
+
+                fetch(`/comment?comment_id=${comment_id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting comment.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting comment.');
+                });
+            }
+        }
     </script>
 
-        <h2>Manage Comments</h2>
-        <!-- Comments Management Section -->
-        <!-- Add form/interface for managing comments on index page content -->
+
     </div>
 </div>
 </body>

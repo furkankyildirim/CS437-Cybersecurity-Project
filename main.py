@@ -306,9 +306,9 @@ def users():
             # Return an error message
             return {'message': 'You do not have permission to delete a user.'}, 403
 
-        username = request.args.get('username')
+        user_id = request.args.get('user_id')
 
-        db.users.delete_one({'username': username})
+        db.users.delete_one({'_id': ObjectId(user_id)})
 
         # Return a success message
         return jsonify({'message': 'User deleted successfully.'})
@@ -331,8 +331,9 @@ def admin_dashboard():
 
     # Call the users API to get all users
     user_data = get_users()
+    comments = list(db.comments.find({}))
     return render_template('admin_dashboard.html', user_id=user_id, username=username,
-                           users=user_data, user_count=len(user_data))
+                           users=user_data, comments=comments)
 
 
 @app.route('/logout', methods=['GET'])
@@ -378,16 +379,15 @@ def comment():
 
     if request.method == 'DELETE':
         # Get the comment id from the request body
-        comment_id = request.json['comment_id']
+        comment_id = request.args.get('comment_id')
 
         # Get the user from the JWT
         user_id = get_jwt_identity()
-        user = db.users.find_one({'_id': user_id})
-
+        user = db.users.find_one({'_id': ObjectId(user_id)})
         # Check if user is admin or the comment owner
-        if user['isAdmin'] or db.comments.find_one({'_id': comment_id})['user_id'] == user_id:
+        if (user and user['isAdmin']) or db.comments.find_one({'_id': comment_id})['user_id'] == user_id:
             # Delete the comment from MongoDB
-            db.comments.delete_one({'_id': comment_id})
+            db.comments.delete_one({'_id': ObjectId(comment_id)})
         else:
             # Return an error message
             return {'message': 'You do not have permission to delete this comment.'}, 403

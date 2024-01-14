@@ -183,7 +183,7 @@ def admin_dashboard():
 
 @app.route('/logout', methods=['GET'])
 def logout():
-    response = redirect(url_for('login'))
+    response = redirect(url_for('index'))
     unset_jwt_cookies(response)  # This will remove the JWT cookies
     flash('You have been logged out.', 'info')
     return response

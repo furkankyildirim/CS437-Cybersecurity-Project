@@ -56,13 +56,12 @@ def index():
     current_user_id = get_jwt_identity()
     print(f"Current User ID: {current_user_id}")
     current_user = None
-    user = None
     if current_user_id:
-        user = db.users.find_one({"_id": current_user_id})
+        user = db.users.find_one({"_id": ObjectId(current_user_id)})
         if user:
             current_user = user.get("username")
     print(f"Current User Name: {current_user}")
-    return render_template('index.html', user=current_user_id, user_name=current_user)
+    return render_template('index.html', user=current_user)  # Pass only the username
 
 
 @app.route('/login', methods=['GET', 'POST'])

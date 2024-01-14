@@ -37,14 +37,14 @@
         <!-- Display logged-in user's name -->
         <div class="user-info">
             {% if user %}
-                Welcome, {{ user }} (Name: {{ user_name }}) | <a href="/logout" style="color: white;">Logout</a>
+                Welcome, {{ user }} | <a href="/logout" style="color: white;">Logout</a>
             {% else %}
                 <a href="/login" class="login-link" style="color: white;">Login</a>
-                <!-- Add an Admin Login link -->
+                <!-- Admin Login link -->
                 <a href="/admin_login" class="login-link" style="color: white; margin-left: 10px;">Admin Login</a>
             {% endif %}
         </div>        
-    </div>
+    </div>    
 
     <!-- Flash messages section -->
     <div class="flash-messages">

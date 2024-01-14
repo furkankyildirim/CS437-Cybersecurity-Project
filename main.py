@@ -1,5 +1,5 @@
 # main.py
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
@@ -369,10 +369,9 @@ def comment():
         # Get the content id and comment from the request body
         content_id = request.json['content_id']
         data = request.json['comment']
-
         # Get the user id from the JWT
         user_id = get_jwt_identity()
-        user = db.users.find_one({'_id': user_id})
+        user = db.users.find_one({'_id': ObjectId(user_id)})
 
         if not user:
             # Return an error message
@@ -380,6 +379,7 @@ def comment():
 
         # Insert the comment into MongoDB
         db.comments.insert_one({'user_id': user_id, 'username': user['username'],
+                                'date': datetime.now(),
                                 'content_id': content_id, 'comment': data})
 
         # Return a success message
@@ -405,18 +405,21 @@ def comment():
 
 
 @app.route('/content/<int:id>')
+@jwt_required(optional=True)
 def content(id):
     # Your content handling logic here
     data = db.contents.find_one({'_id': id})
     user_id = request.cookies.get('user_id')
     comments = list(db.comments.find({'content_id': id}))
+    current_user_id = get_jwt_identity()
 
     for row in comments:
         if str(row['user_id']) == str(user_id):
             row['isOwner'] = True
         else:
             row['isOwner'] = False
-    return render_template('content.html', content=data, comments=comments)
+    return render_template('content.html', content=data, comments=comments,
+                           is_logged_in=current_user_id)
 
 
 if __name__ == '__main__':

@@ -16,10 +16,38 @@
             <div class="comment">
                 <h3>{{comment['username']}}</h3>
                 <p>{{comment['comment']}}</p>
+                <p>{{comment['user_id']}}</p>
+                <p>{{user_id}}</p>
                 <p>{{comment['date']}}</p>
+                <!-- if the user is logged in and the comment is theirs, show the delete button -->
+                {% if comment['isOwner'] %}
+                    <button onclick="deleteComment('{{ comment._id }}')">Delete</button>
+                {% endif %}
             </div>
         {% endfor %}
     {% endif %}
+
+    <script>
+        function deleteComment(comment_id) {
+            if (confirm('Are you sure you want to delete this comment?')) {
+
+                fetch(`/comment?comment_id=${comment_id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting comment.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting comment.');
+                });
+            }
+        }
+    </script>
 
     
 </body>

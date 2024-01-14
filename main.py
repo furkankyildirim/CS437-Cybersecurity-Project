@@ -36,7 +36,7 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USERNAME'] = 'cs437mfa@gmail.com'  # Your Gmail email address
 app.config['MAIL_PASSWORD'] = 'vzzy pxea yqma mffx'  # Application password generated for Gmail
-#app.config['MAIL_DEBUG'] = True
+# app.config['MAIL_DEBUG'] = True
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 
@@ -71,6 +71,7 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_SECURE'] = False  # Should be true in production with HTTPS
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Enable CSRF protection in production
 
+
 @app.route('/')
 @jwt_required(optional=True)
 def index():
@@ -99,12 +100,14 @@ def verify_recaptcha():
         return "Captcha Verification Failed", 400
         flash('Not logged in.', 'warning')  # For debugging, remove this later
 
+
 # Define the form for entering the email
 class ForgotPasswordForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     otp = StringField('OTP', validators=[Length(min=6, max=6)])
     new_password = PasswordField('New Password', validators=[Length(min=8)])
     submit = SubmitField('Submit')
+
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")  # Apply rate limit to this route
@@ -134,7 +137,9 @@ def forgot_password():
 
             try:
                 mail.send(msg)
-                flash('An email with a recovery code has been sent to your email address. Enter the code and your new password below.', 'info')
+                flash(
+                    'An email with a recovery code has been sent to your email address. Enter the code and your new password below.',
+                    'info')
                 session['reset_stage'] = 'verify_otp'  # Move to the next stage
             except Exception as e:
                 flash(f'Error sending the email: {str(e)}', 'error')
@@ -147,7 +152,7 @@ def forgot_password():
 
             # Verify OTP
             if (session.get('recovery_code') == recovery_code and
-                int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
+                    int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
                 # Reset password logic
                 # [Update user's password in the database]
 
@@ -163,6 +168,7 @@ def forgot_password():
                 flash('Invalid or expired recovery code.', 'error')
 
     return render_template('forgot_password.html', form=form)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -188,7 +194,7 @@ def login():
             # Set JWT as a cookie
             response = redirect(url_for('index'))
             response.set_cookie('access_token_cookie', value=access_token, httponly=True, secure=False)
-
+            response.set_cookie('user_id', value=user_id, httponly=True, secure=False)
             # Flash a success message
             flash('Login successful!', 'success')
 
@@ -340,6 +346,9 @@ def admin_dashboard():
 def logout():
     response = redirect(url_for('index'))
     unset_jwt_cookies(response)  # This will remove the JWT cookies
+    # delete the user_id cookie
+    response.set_cookie('access_token_cookie', '', expires=0)
+    response.set_cookie('user_id', '', expires=0)
     flash('You have been logged out.', 'info')
     return response
 
@@ -385,7 +394,7 @@ def comment():
         user_id = get_jwt_identity()
         user = db.users.find_one({'_id': ObjectId(user_id)})
         # Check if user is admin or the comment owner
-        if (user and user['isAdmin']) or db.comments.find_one({'_id': comment_id})['user_id'] == user_id:
+        if (user and user['isAdmin']) or str(db.comments.find_one({'_id': ObjectId(comment_id)})['user_id']) == user_id:
             # Delete the comment from MongoDB
             db.comments.delete_one({'_id': ObjectId(comment_id)})
         else:
@@ -400,7 +409,14 @@ def comment():
 def content(id):
     # Your content handling logic here
     data = db.contents.find_one({'_id': id})
+    user_id = request.cookies.get('user_id')
     comments = list(db.comments.find({'content_id': id}))
+
+    for row in comments:
+        if str(row['user_id']) == str(user_id):
+            row['isOwner'] = True
+        else:
+            row['isOwner'] = False
     return render_template('content.html', content=data, comments=comments)
 
 

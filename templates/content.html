@@ -3,35 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Turkish Travel Advice - Content</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            background-color: #f4f4f4;
+            line-height: 1.6;
+        }
+        .header, .footer {
+            background-color: #005f6b;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+        }
+        .nav {
+            overflow: hidden;
+            background-color: #333;
+            padding: 0;
+        }
+        .nav a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover {
+            background-color: #2675d8;
+        }
+
+        /* Content and Article styles */
+        .content {
+            padding: 2rem;
+        }
+        .article {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .article h2 {
+            color: #005f6b;
+            margin-top: 0;
+        }
+        .article-content {
+            font-size: 1rem;
+            color: #333;
+            border-left: 4px solid #005f6b;
+            padding-left: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Comments and form styles */
+        .comments, .comment-form {
+            background-color: #e9ecef;
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+        .comment {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .comment h3 {
+            color: #005f6b;
+            margin-bottom: 0.5rem;
+        }
+        .comment p {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        .comment button {
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .comment button:hover {
+            background-color: #c9302c;
+        }
+        textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-bottom: 1rem;
+        }
+        button.post-button {
+            background-color: #0275d8;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button.post-button:hover {
+            background-color: #025aa5;
+        }
+    </style>
 </head>
 <body>
-    {{content['security_content'] | safe}}
+    <div class="header">
+        <h1>Turkish Travel Advice</h1>
+    </div>
 
-    <h2>Posted messages</h2>
-    {% if is_logged_in %}
-        <p>Post a message</p>
-        <textarea id="comment" placeholder="Enter your message"></textarea>
-        <button onclick="addComment({{content['_id']}})">Post</button>
-    {% else %}
-        <p></p>
-    {% endif %}
-    {% if comments|length == 0 %}
-        <p>There are no messages yet.</p>
-    {% else %}
-        {% for comment in comments%}
-            <div class="comment">
-                <h3>{{comment['username']}}</h3>
-                <p>{{comment['comment']}}</p>
-                <p>{{user_id}}</p>
-                <p>{{comment['date']}}</p>
-                <!-- if the user is logged in and the comment is theirs, show the delete button -->
-                {% if comment['isOwner'] %}
-                    <button onclick="deleteComment('{{ comment._id }}')">Delete</button>
-                {% endif %}
+    <div class="nav">
+        <a href="/">Home</a>
+    </div>
+
+    <div class="content">
+        <div class="article">
+            <h2>Travel Security Information</h2>
+            <div class="article-content">
+                {{ content['security_content'] | safe }}
             </div>
-        {% endfor %}
-    {% endif %}
+        </div>
+
+        <div class="comment-form">
+            <h2>Post a Message</h2>
+            {% if is_logged_in %}
+                <textarea id="comment" placeholder="Enter your message"></textarea>
+                <button class="post-button" onclick="addComment({{content['_id']}})">Post Message</button>
+            {% else %}
+                <p>Please log in to post messages.</p>
+            {% endif %}
+        </div>
+
+        <div class="comments">
+            <h2>Posted Messages</h2>
+            {% if comments|length == 0 %}
+                <p>There are no messages yet.</p>
+            {% else %}
+                {% for comment in comments %}
+                    <div class="comment">
+                        <h3>{{ comment['username'] }}</h3>
+                        <p>{{ comment['comment'] }}</p>
+                        <p>Posted on: {{ comment['date'] }}</p>
+                        {% if comment['isOwner'] %}
+                            <button onclick="deleteComment('{{ comment['_id'] }}')">Delete</button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Turkish Travel Advice &copy; 2024</p>
+    </div>
 
 
     <script>

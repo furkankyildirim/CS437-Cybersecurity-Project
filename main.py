@@ -1,6 +1,10 @@
 # main.py
+import hashlib
+import json
+import logging
 import random
 from datetime import timedelta, datetime
+from logging.handlers import RotatingFileHandler
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
@@ -57,6 +61,12 @@ mongo_uri = f'mongodb://{mongo_server}:{mongo_port}/'
 client = MongoClient(mongo_uri)
 db = client[mongo_db]
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=1)
+logger.addHandler(handler)
+
 # Initialize Flask-JWT-Extended
 jwt = JWTManager(app)
 
@@ -73,6 +83,22 @@ twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
 
 # Set the reCAPTCHA secret key
 recaptcha_secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
+
+
+@app.before_request
+def log_request_info():
+    # Try to get the real IP address from X-Forwarded-For header
+    client_ip = request.headers.get('X-Forwarded-For')
+
+    # If X-Forwarded-For is not present, use request.remote_addr
+    if not client_ip:
+        client_ip = request.remote_addr
+
+    user_agent = request.user_agent.string
+    host = request.headers.get('Host', '')
+    logger.info(f"Timestamp: {datetime.now()}, Client IP: {client_ip}, User Agent: {user_agent}, Host: {host}, "
+                f"URL: {request.url}, Method: {request.method}, Body: {request.get_data().decode('utf-8')}, "
+                f"Headers: {request.headers}")
 
 
 @app.route('/')
@@ -125,6 +151,10 @@ def forgot_password():
     if request.method == 'POST' and 'recovery_code' not in session:
         email = form.email.data
         user = db.users.find_one({'email': email})
+
+        logger.info(f"Password reset request from IP: {request.remote_addr} "
+                    f"with email: {email}")
+
         if user:
             # Generate a random recovery code and timestamp
             recovery_code = random.randint(100000, 999999)
@@ -165,6 +195,8 @@ def verify_code():
         new_password = form.password.data
 
         verification = db.verifications.find_one({'target': session.get('reset_email')})
+        logger.info(f"Password reset request from IP: {request.remote_addr} "
+                    f"with email: {session.get('reset_email')}")
 
         if verification:
             # Check if the recovery code is correct
@@ -205,6 +237,9 @@ def admin_forgot_password():
     if request.method == 'POST' and 'recovery_code' not in session:
         phone = form.phone.data
         user = db.users.find_one({'phone': phone})
+
+        logger.info(f"Admin password reset request from IP: {request.remote_addr} "
+                    f"with phone: {phone}")
         if user:
             # Generate a random recovery code and timestamp
             recovery_code = random.randint(100000, 999999)
@@ -244,6 +279,8 @@ def admin_verify_code():
         recovery_code = form.code.data
         new_password = form.password.data
 
+        logger.info(f"Admin password reset request from IP: {request.remote_addr} "
+                    f"with phone: {session.get('reset_phone')}")
         verification = db.verifications.find_one({'target': session.get('reset_phone')})
 
         if verification:
@@ -281,6 +318,7 @@ def admin_verify_code():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        logger.info(f"Login request from IP: {request.remote_addr} with username: {request.form.get('username')}")
         # Get the CAPTCHA response
         captcha_response = request.form['captcha_response']
         # Check if the CAPTCHA response is correct (for example, '5' for the above math question)
@@ -320,6 +358,7 @@ def login():
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
+        logger.info(f"Admin login request from IP: {request.remote_addr} with username: {request.form.get('username')}")
         username = request.form.get('username')
         password = request.form.get('password')
 
@@ -395,6 +434,7 @@ def users():
         # Get the username, email, password, and isAdmin from the request body
         current_user = get_jwt_identity()
         user = db.users.find_one({'_id': ObjectId(current_user)})
+        logger.info(f"User {user['username']} is adding a new user from IP: {request.remote_addr}")
 
         if not user or not user['isAdmin']:
             # Return an error message
@@ -415,7 +455,7 @@ def users():
         # Get the user id from the request body
         current_user = get_jwt_identity()
         user = db.users.find_one({'_id': ObjectId(current_user)})
-
+        logger.info(f"User {user['username']} is deleting a user from IP: {request.remote_addr}")
         if not user or not user['isAdmin']:
             # Return an error message
             return {'message': 'You do not have permission to delete a user.'}, 403
@@ -438,6 +478,7 @@ def admin_dashboard():
     # Replace 'username_field' with the actual field name for the username in your database
     admin_user = db.users.find_one({'_id': ObjectId(user_id)})
     username = admin_user.get('username', 'Unknown') if admin_user else 'Unknown'
+    logger.info(f"User {username} is accessing the admin dashboard from IP: {request.remote_addr}")
 
     if not claims.get("is_admin"):
         flash("You do not have permission to access the admin dashboard.", "error")
@@ -457,6 +498,7 @@ def logout():
     # delete the user_id cookie
     response.set_cookie('access_token_cookie', '', expires=0)
     response.set_cookie('user_id', '', expires=0)
+    logger.info(f"User logged out from IP: {request.remote_addr}")
     flash('You have been logged out.', 'info')
     return response
 
@@ -481,6 +523,7 @@ def comment():
         # Get the user id from the JWT
         user_id = get_jwt_identity()
         user = db.users.find_one({'_id': ObjectId(user_id)})
+        logger.info(f"User {user['username']} is adding a comment from IP: {request.remote_addr}")
 
         if not user:
             # Return an error message
@@ -501,6 +544,8 @@ def comment():
         # Get the user from the JWT
         user_id = get_jwt_identity()
         user = db.users.find_one({'_id': ObjectId(user_id)})
+        logger.info(f"User {user['username']} is deleting a comment from IP: {request.remote_addr}")
+
         # Check if user is admin or the comment owner
         if (user and user['isAdmin']) or str(db.comments.find_one({'_id': ObjectId(comment_id)})['user_id']) == user_id:
             # Delete the comment from MongoDB

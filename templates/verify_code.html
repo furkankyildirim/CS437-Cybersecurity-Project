@@ -3,18 +3,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Turkish Travel Advice - Login</title>
+    <title>Turkish Travel Advice - Forgot Password</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f0f8ff; }
         .container { width: 300px; margin: auto; padding: 20px; }
-        .login { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .form-group { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
         input[type=text], input[type=password], button, .back-button { width: 100%; padding: 10px; margin: 5px 0 10px 0; border: 1px solid #ddd; border-radius: 5px; }
         button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
         button:hover { background-color: #45a049; }
         .back-button { background-color: #e7e7e7; color: black; border: none; }
         .back-button:hover { background-color: #d4d4d4; }
-        .forgot { font-size: 12px; text-align: center; }
-        .captcha { text-align: center; margin-top: 20px; }
         .flash-messages { padding: 10px; text-align: center; color: red; }
     </style>
 </head>
@@ -30,23 +28,16 @@
                 {% endif %}
             {% endwith %}
         </div>
-        <h1>Login</h1>
-        <div class="login">
-            <form action="/login" method="post">
+        <h1>Verify Code</h1>
+        <div class="form-group">
+            <form action="/verify-code" method="post">
                 <label>
-                    <input type="text" name="username" placeholder="Username" required>
+                    <input type="text" name="code" placeholder="Verification code" required />
                 </label>
                 <label>
-                    <input type="password" name="password" placeholder="Password" required>
+                    <input type="password" name="password" placeholder="New password" required />
                 </label>
-                <div class="captcha">
-                    <label for="captcha">Solve this to prove you're human: <br> 3 + 4 = ?</label>
-                    <input type="text" id="captcha" name="captcha_response" required>
-                </div>
-                <button type="submit">Login</button>
-                <div class="forgot">
-                    <a href="/forgot_password">Forgot My Password</a>
-                </div>
+                <button type="submit">Update Password</button>
             </form>
             <!-- Button to go back to the home page -->
             <button onclick="location.href='/'" class="back-button">Back to Home</button>

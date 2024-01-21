@@ -1,9 +1,11 @@
 # main.py
+import random
 from datetime import timedelta, datetime
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies,get_jwt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, \
+    get_jwt
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -35,7 +37,7 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USERNAME'] = 'cs437mfa@gmail.com'  # Your Gmail email address
 app.config['MAIL_PASSWORD'] = 'kvsg mabn dmnd xgcp'  # Application password generated for Gmail
-#app.config['MAIL_DEBUG'] = True
+# app.config['MAIL_DEBUG'] = True
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 
@@ -103,71 +105,98 @@ def verify_recaptcha():
 # Define the form for entering the email
 class ForgotPasswordForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
-    otp = StringField('OTP', validators=[Length(min=6, max=6)])
-    new_password = PasswordField('New Password', validators=[Length(min=8)])
     submit = SubmitField('Submit')
 
+
+# Define the form for entering the OTP and new password
+class VerifyCodeForm(FlaskForm):
+    code = StringField('Verify Code', validators=[DataRequired(), Length(min=6, max=6)])
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8, max=20)])
+    submit = SubmitField('Submit')
+
+
 @app.route('/forgot_password', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")  # Apply rate limit to this route
+@limiter.limit("2 per minute")  # Apply rate limit to this route
 def forgot_password():
     form = ForgotPasswordForm()
-    if form.validate_on_submit() and 'recovery_code' in session:
-        recovery_code = form.otp.data
-        new_password = form.new_password.data
+    print(f"Session: {session}")
+    if request.method == 'POST' and 'recovery_code' not in session:
+        email = form.email.data
+        # [Check if email exists in the database]
+        # This is where you would check if the email exists in the database.
+        # If it doesn't, you can show an error message to the user.
+        user = db.users.find_one({'email': email})
+        if user:
+            # Generate a random recovery code and timestamp
+            recovery_code = random.randint(100000, 999999)
+            timestamp = int(time.time())
 
-        # Verify OTP
-        if (session.get('recovery_code') == recovery_code and
-            int(time.time()) - session.get('recovery_code_timestamp', 0) < 600):
-            # Reset password logic
-            # [Update user's password in the database]
-            # This is where you would update the user's password in the database.
-            # Ensure to hash the new password before storing it.
-            email = session.get('reset_email')
-            user = db.users.find_one({'email': email})
-            if user:
-                db.users.update_one(
-                    {'email': email}, 
-                    {'$set': {'password': generate_password_hash(new_password)}}
-                )
-                flash('Your password has been reset successfully.', 'success')
-            else:
-                flash('User not found.', 'error')
+            # Delete any existing recovery codes for the user
+            db.verifications.delete_many({'email': email})
 
-            # Clear session variables related to reset
-            session.pop('recovery_code', None)
-            session.pop('recovery_code_timestamp', None)
-            session.pop('reset_email', None)
+            # Store the recovery code and timestamp in the database
+            db.verifications.insert_one({'email': email, 'recovery_code': recovery_code, 'timestamp': timestamp})
 
-            return redirect(url_for('login'))
+            # Set email session variable
+            session['reset_email'] = email
+
+            # Store the recovery code and timestamp in the session
+            subject = 'Password Reset Code'
+            body = f'Your password reset code is: {recovery_code}'
+            msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
+            msg.body = body
+
+            try:
+                mail.send(msg)
+                return redirect(url_for('verify_code'))
+            except Exception as e:
+                flash(f'Error sending the email: {str(e)}', 'error')
         else:
-            flash('Invalid or expired recovery code.', 'error')
+            flash('User not found.', 'error')
 
     return render_template('forgot_password.html', form=form)
 
+
 # New route for requesting OTP
-@app.route('/request_otp', methods=['POST'])
-@limiter.limit("5 per minute")
-def request_otp():
-    email = request.form.get('email')
-    if email:
-        recovery_code = pyotp.random_base32()
-        session['recovery_code'] = recovery_code
-        session['recovery_code_timestamp'] = int(time.time())
-        session['reset_email'] = email
-        subject = 'Password Reset Code'
-        body = f'Your password reset code is: {recovery_code}'
-        msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[email])
-        msg.body = body
+@app.route('/verify-code', methods=['GET', 'POST'])
+def verify_code():
+    form = VerifyCodeForm()
+    if request.method == 'POST':
+        recovery_code = form.code.data
+        new_password = form.password.data
 
-        try:
-            mail.send(msg)
-            flash('An email with a recovery code has been sent to your email address.', 'info')
-        except Exception as e:
-            flash(f'Error sending the email: {str(e)}', 'error')
-    else:
-        flash('Please enter a valid email address.', 'error')
+        verification = db.verifications.find_one({'email': session.get('reset_email')})
 
-    return redirect(url_for('forgot_password'))
+        if verification:
+            # Check if the recovery code is correct
+            if verification['recovery_code'] == int(recovery_code):
+                # Check if the recovery code is expired (2 minutes)
+                if int(time.time()) - verification['timestamp'] > 120:
+                    flash('The recovery code has expired. Please try again.', 'error')
+                    return redirect(url_for('forgot_password'))
+                else:
+                    # Update the user's password
+                    db.users.update_one({'email': session.get('reset_email')},
+                                        {'$set': {'password': generate_password_hash(new_password)}})
+
+                    # Delete the verification document from the database
+                    db.verifications.delete_one({'email': session.get('reset_email')})
+                    # Delete the email session variable
+                    session.pop('reset_email', None)
+
+                    flash('Your password has been updated.', 'success')
+                    return redirect(url_for('login'))
+            else:
+                flash('Invalid recovery code.', 'error')
+                return redirect(url_for('forgot_password'))
+        else:
+            flash('Invalid recovery code.', 'error')
+            return redirect(url_for('forgot_password'))
+
+    if 'reset_email' not in session:
+        return redirect(url_for('forgot_password'))
+
+    return render_template('verify_code.html', form=form)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -424,4 +453,4 @@ def content(id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000)
+    app.run(debug=True, host='localhost', port=8000)

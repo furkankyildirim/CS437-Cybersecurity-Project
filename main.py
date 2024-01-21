@@ -13,10 +13,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from flask_mail import Mail, Message
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import os, requests, pyotp, time
+import os, requests, time
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, Length
+from twilio.rest import Client
 
 app = Flask(__name__)
 load_dotenv()
@@ -29,7 +30,7 @@ limiter = Limiter(
 )
 
 # Set the secret key for session management
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'a_default_secret_key')
+app.config['SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 app.config['RECAPTCHA_SECRET_KEY'] = 'your_secret_key_here'
 
 # Configure Flask-Mail for sending emails
@@ -51,16 +52,9 @@ mongo_server = "localhost"
 mongo_port = os.getenv('MONGODB_PORT')
 mongo_db = os.getenv('MONGODB_DATABASE')
 
-# MongoDB URI
-# mongo_uri = f'mongodb://{mongo_user}:{mongo_password}@{mongo_server}:{mongo_port}'
-
-# MongoDB URI without authentication
-mongo_uri = f'mongodb://{mongo_server}:{mongo_port}/'
-
 # Connect to MongoDB
+mongo_uri = f'mongodb://{mongo_server}:{mongo_port}/'
 client = MongoClient(mongo_uri)
-
-# Create a database
 db = client[mongo_db]
 
 # Initialize Flask-JWT-Extended
@@ -72,26 +66,31 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_SECURE'] = False  # Should be true in production with HTTPS
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Enable CSRF protection in production
 
+# Set the Twilio API credentials for SMS
+twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+twilio_auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
+
+# Set the reCAPTCHA secret key
+recaptcha_secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
+
 
 @app.route('/')
 @jwt_required(optional=True)
 def index():
     current_user_id = get_jwt_identity()
-    print(f"Current User ID: {current_user_id}")
     current_user = None
     if current_user_id:
         user = db.users.find_one({"_id": ObjectId(current_user_id)})
         if user:
             current_user = user.get("username")
-    print(f"Current User Name: {current_user}")
     return render_template('index.html', user=current_user, data_list=db.contents.find({}))  # Pass only the username
 
 
 @app.route('/verify_recaptcha', methods=['POST'])
 def verify_recaptcha():
     recaptcha_response = request.form.get('g-recaptcha-response')
-    secret = app.config['RECAPTCHA_SECRET_KEY']
-    payload = {'secret': secret, 'response': recaptcha_response}
+    payload = {'secret': recaptcha_secret_key, 'response': recaptcha_response}
     response = requests.post('https://www.google.com/recaptcha/api/siteverify', data=payload)
     result = response.json()
 
@@ -99,7 +98,6 @@ def verify_recaptcha():
         return "Captcha Verified Successfully"
     else:
         return "Captcha Verification Failed", 400
-        flash('Not logged in.', 'warning')  # For debugging, remove this later
 
 
 # Define the form for entering the email
@@ -115,16 +113,17 @@ class VerifyCodeForm(FlaskForm):
     submit = SubmitField('Submit')
 
 
+class AdminForgotPasswordForm(FlaskForm):
+    phone = StringField('Phone', validators=[DataRequired(), Length(min=10, max=10)])
+    submit = SubmitField('Submit')
+
+
 @app.route('/forgot_password', methods=['GET', 'POST'])
 @limiter.limit("2 per minute")  # Apply rate limit to this route
 def forgot_password():
     form = ForgotPasswordForm()
-    print(f"Session: {session}")
     if request.method == 'POST' and 'recovery_code' not in session:
         email = form.email.data
-        # [Check if email exists in the database]
-        # This is where you would check if the email exists in the database.
-        # If it doesn't, you can show an error message to the user.
         user = db.users.find_one({'email': email})
         if user:
             # Generate a random recovery code and timestamp
@@ -132,10 +131,10 @@ def forgot_password():
             timestamp = int(time.time())
 
             # Delete any existing recovery codes for the user
-            db.verifications.delete_many({'email': email})
+            db.verifications.delete_many({'target': email})
 
             # Store the recovery code and timestamp in the database
-            db.verifications.insert_one({'email': email, 'recovery_code': recovery_code, 'timestamp': timestamp})
+            db.verifications.insert_one({'target': email, 'recovery_code': recovery_code, 'timestamp': timestamp})
 
             # Set email session variable
             session['reset_email'] = email
@@ -165,7 +164,7 @@ def verify_code():
         recovery_code = form.code.data
         new_password = form.password.data
 
-        verification = db.verifications.find_one({'email': session.get('reset_email')})
+        verification = db.verifications.find_one({'target': session.get('reset_email')})
 
         if verification:
             # Check if the recovery code is correct
@@ -180,7 +179,7 @@ def verify_code():
                                         {'$set': {'password': generate_password_hash(new_password)}})
 
                     # Delete the verification document from the database
-                    db.verifications.delete_one({'email': session.get('reset_email')})
+                    db.verifications.delete_one({'target': session.get('reset_email')})
                     # Delete the email session variable
                     session.pop('reset_email', None)
 
@@ -197,6 +196,86 @@ def verify_code():
         return redirect(url_for('forgot_password'))
 
     return render_template('verify_code.html', form=form)
+
+
+@app.route('/admin-forgot-password', methods=['GET', 'POST'])
+@limiter.limit("2 per minute")  # Apply rate limit to this route
+def admin_forgot_password():
+    form = AdminForgotPasswordForm()
+    if request.method == 'POST' and 'recovery_code' not in session:
+        phone = form.phone.data
+        user = db.users.find_one({'phone': phone})
+        if user:
+            # Generate a random recovery code and timestamp
+            recovery_code = random.randint(100000, 999999)
+            timestamp = int(time.time())
+
+            # Delete any existing recovery codes for the user
+            db.verifications.delete_many({'target': phone})
+
+            # Store the recovery code and timestamp in the database
+            db.verifications.insert_one({'target': phone, 'recovery_code': recovery_code, 'timestamp': timestamp})
+
+            # Set email session variable
+            session['reset_phone'] = phone
+
+            # Store the recovery code and timestamp in the session
+            account_sid = twilio_account_sid
+            auth_token = twilio_auth_token
+            twilio_client = Client(account_sid, auth_token)
+
+            message = twilio_client.messages.create(
+                body=f'Your password reset code is: {recovery_code}',
+                from_=twilio_phone_number, to=f'+90{phone}'
+            )
+
+            print(message.sid)
+            return redirect(url_for('admin_verify_code'))
+        else:
+            flash('User not found.', 'error')
+
+    return render_template('admin_forgot_password.html', form=form)
+
+
+@app.route('/admin-verify-code', methods=['GET', 'POST'])
+def admin_verify_code():
+    form = VerifyCodeForm()
+    if request.method == 'POST':
+        recovery_code = form.code.data
+        new_password = form.password.data
+
+        verification = db.verifications.find_one({'target': session.get('reset_phone')})
+
+        if verification:
+            # Check if the recovery code is correct
+            if verification['recovery_code'] == int(recovery_code):
+                # Check if the recovery code is expired (2 minutes)
+                if int(time.time()) - verification['timestamp'] > 120:
+                    flash('The recovery code has expired. Please try again.', 'error')
+                    return redirect(url_for('admin_forgot_password'))
+                else:
+                    # Update the user's password
+                    db.users.update_one({'phone': session.get('reset_phone')},
+                                        {'$set': {'password': generate_password_hash(new_password)}})
+
+                    # Delete the verification document from the database
+                    db.verifications.delete_one({'target': session.get('reset_phone')})
+                    # Delete the email session variable
+                    session.pop('reset_phone', None)
+
+                    flash('Your password has been updated.', 'success')
+                    return redirect(url_for('admin_login'))
+            else:
+                flash('Invalid recovery code.', 'error')
+
+        else:
+            flash('Invalid recovery code.', 'error')
+            return redirect(url_for('admin_forgot_password'))
+
+    if 'reset_phone' not in session:
+        return redirect(url_for('admin_forgot_password'))
+
+    return render_template('admin_verify_code.html', form=form)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -440,15 +519,15 @@ def content(id):
     # Your content handling logic here
     data = db.contents.find_one({'_id': id})
     user_id = request.cookies.get('user_id')
-    comments = list(db.comments.find({'content_id': id}))
+    details = list(db.comments.find({'content_id': id}))
     current_user_id = get_jwt_identity()
 
-    for row in comments:
+    for row in details:
         if str(row['user_id']) == str(user_id):
             row['isOwner'] = True
         else:
             row['isOwner'] = False
-    return render_template('content.html', content=data, comments=comments,
+    return render_template('content.html', content=data, comments=details,
                            is_logged_in=current_user_id)
 
 

@@ -119,7 +119,7 @@ class AdminForgotPasswordForm(FlaskForm):
 
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
-@limiter.limit("2 per minute")  # Apply rate limit to this route
+# @limiter.limit("2 per minute")  # Apply rate limit to this route
 def forgot_password():
     form = ForgotPasswordForm()
     if request.method == 'POST' and 'recovery_code' not in session:
@@ -127,7 +127,7 @@ def forgot_password():
         user = db.users.find_one({'email': email})
         if user:
             # Generate a random recovery code and timestamp
-            recovery_code = random.randint(100000, 999999)
+            recovery_code = random.randint(10, 99)
             timestamp = int(time.time())
 
             # Delete any existing recovery codes for the user
@@ -184,7 +184,7 @@ def verify_code():
                     session.pop('reset_email', None)
 
                     flash('Your password has been updated.', 'success')
-                    return redirect(url_for('login'))
+                    return redirect(url_for('login'), code=201)
             else:
                 flash('Invalid recovery code.', 'error')
                 return redirect(url_for('forgot_password'))

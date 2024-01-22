@@ -20,7 +20,7 @@ client = MongoClient(mongo_uri)
 # Access the database
 db = client[mongo_db]
 
-user = db.users.find_one({'username': 'user1'})
+user = db.users.find_one({'username': 'user2'})
 content_id = db.contents.find_one({'country': 'Argentina'})['_id']
 # Create comments
 

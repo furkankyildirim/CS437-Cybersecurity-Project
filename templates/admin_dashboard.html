@@ -18,10 +18,6 @@
             color: white;
         }
 
-        .header h1 {
-            margin: 0;
-        }
-
         .nav {
             overflow: hidden;
             background-color: #333;
@@ -36,9 +32,10 @@
             text-decoration: none;
         }
 
+        /* Updated hover color to match index page */
         .nav a:hover {
-            background-color: #ddd;
-            color: black;
+            background-color: #2675d8;
+            color: white;
         }
 
         .content {
@@ -53,13 +50,8 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .article img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 5px;
-        }
-
-        .article h2 {
+        /* Consistent color for headings */
+        .article h2, .content h2 {
             color: #005f6b;
         }
 
@@ -97,7 +89,7 @@
             border-color: #ebccd1;
         }
 
-        /* Add additional CSS styles specific to the admin dashboard page */
+        /* Additional CSS styles specific to the admin dashboard page */
         .container {
             max-width: 800px;
             margin: auto;
@@ -106,6 +98,14 @@
 
         button {
             cursor: pointer;
+        }
+
+        /* Styling links to match index page */
+        a {
+            color: #005f6b;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -126,18 +126,19 @@
         </div>
     </div>
 
+    <!-- Navigation Bar -->
+    <div class="nav">
+        <a href="/">Home</a>
+    </div>
+
     <!-- Content -->
     <div class="content">
         <h1>Admin Dashboard</h1>
-
-        <!-- Display Admin User ID and Name -->
         <p>Logged in as: <strong>{{ username }}</strong> (User ID: {{ user_id }})</p>
-        <!-- Home Button -->
         <button onclick="location.href='/'">Home</button>
 
-        <h2>Manage Users</h2>
         <!-- Users Management Section -->
-        <!-- Add form/interface for adding and removing users -->
+        <h2>Manage Users</h2>
         <form onsubmit="addUser(); return false;">
             <label for="username">Username:</label>
             <input type="text" name="username" id="username" placeholder="Username" required>
@@ -148,28 +149,26 @@
             <button type="submit">Add User</button>
         </form>
 
-        <!-- Display list of users from /users endpoint -->
+        <!-- List of users -->
         <h3>Users</h3>
         <ul>
             {% for user in users %}
-                <!-- Add a Delete link for each user with DELETE method -->
                 <li>{{ user.username }} ({{ user.email }}) (User ID: {{ user._id }})
                     <button onclick="deleteUser('{{ user._id }}')">Delete</button>
                 </li>
             {% endfor %}
         </ul>
 
-        <h2>Manage Comments</h2>
         <!-- Comments Management Section -->
-        <!-- Display list of comments from /comments endpoint -->
+        <h2>Manage Comments</h2>
         <h3>Comments</h3>
         <ul>
             {% for comment in comments %}
-                <!-- Add a Delete link for each comment with DELETE method -->
                 <li>{{ comment.comment }} ({{ comment.username }}) (Comment ID: {{ comment._id }})
                     <button onclick="deleteComment('{{ comment._id }}')">Delete</button>
                 </li>
             {% endfor %}
+        </ul>
 
         <script>
         function deleteUser(userId) {
@@ -237,8 +236,13 @@
         }
     </script>
 
-
     </div>
+    <!-- Footer -->
+    <div class="footer">
+        <p>Turkish Travel Advice &copy; 2024</p>
+    </div>
+
+
 </div>
 </body>
 </html>

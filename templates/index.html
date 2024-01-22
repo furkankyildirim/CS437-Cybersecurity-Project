@@ -31,12 +31,15 @@
         <div class="user-info">
             {% if user %}
                 Welcome, {{ user }} | <a href="/logout" style="color: white;">Logout</a>
+                {% if is_admin %}
+                    | <a href="/admin_dashboard" style="color: white; margin-left: 10px;">Admin Dashboard</a>
+                {% endif %}
             {% else %}
                 <a href="/login" class="login-link" style="color: white;">Login</a>
                 <a href="/admin_login" class="login-link" style="color: white; margin-left: 10px;">Admin Login</a>
             {% endif %}
         </div>        
-    </div>    
+    </div>
 
     <div class="flash-messages">
         {% with messages = get_flashed_messages(with_categories=true) %}

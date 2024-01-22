@@ -106,11 +106,17 @@ def log_request_info():
 def index():
     current_user_id = get_jwt_identity()
     current_user = None
+    is_admin = False  # Initialize is_admin as False
+
     if current_user_id:
         user = db.users.find_one({"_id": ObjectId(current_user_id)})
         if user:
             current_user = user.get("username")
-    return render_template('index.html', user=current_user, data_list=db.contents.find({}))  # Pass only the username
+            # Check if user has admin privileges
+            claims = get_jwt()
+            is_admin = claims.get("is_admin", False)
+
+    return render_template('index.html', user=current_user, is_admin=is_admin, data_list=db.contents.find({}))
 
 
 @app.route('/verify_recaptcha', methods=['POST'])
